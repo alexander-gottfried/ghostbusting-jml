@@ -1,4 +1,5 @@
-#! ./bin/python
+#! .venv/bin/python
+import sys
 
 import collections
 import itertools
@@ -10,24 +11,10 @@ import boolexpr
 import graph
 import cases
 
-#import tree_sitter_reduced_java
-#from tree_sitter import Language, Parser
-
-"""
-def main():
-    RJAVA = Language(tree_sitter_reduced_java.language())
-    parser = Parser(RJAVA)
-    with open('../supersimple/example.rjava', 'rb') as file:
-        source = file.read()
-        def read(byte_pos, _):
-            return source[byte_pos : byte_pos + 1]
-        tree = parser.parse(read, encoding='utf8')
-        print(tree.root_node)
-"""
-
 
 def main():
-    variables, possible_states, initital_state, methods = cases.casino()
+    variables, possible_states, initital_state, methods =\
+            cases.casino_invariants_only()
     g = graph.from_program(
             possible_states,
             methods)
@@ -38,7 +25,7 @@ def main():
 
     method_names = list(methods.keys())
 
-    cat = cats.from_graph(g, method_names, initital_state)
+    cat = cats.naive_pretrace_from_graph(g, method_names, initital_state)
 
     for method in method_names:
         print(f'\n{method=}\n')
@@ -51,6 +38,13 @@ def main():
         print(f'must contain:\n {m}\n')
         l = [str(x) for x in regex.last_calls(r)]
         print(f'traces end with:\n {l}\n')
+
+from boolexpr import *
+
+def main():
+    import parser
+    example = './example.rjava'
+    parser.parse(example)
 
 
 if __name__ == '__main__':
