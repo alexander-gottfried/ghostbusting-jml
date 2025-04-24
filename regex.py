@@ -2,6 +2,8 @@ import dataclasses
 import functools
 from typing import Self
 
+from dictutil import dict_entry_set_add
+
 class Regex(object):
     __match_args__ = ()
 
@@ -224,12 +226,6 @@ def last_calls(regex: Regex) -> Regex:
     return set(alter_to_list(aux(regex)))
 
 
-def add_index(d, key, i):
-    if not key in d:
-        d[key] = set()
-    d[key].add(i)
-
-
 def graph(graph, starting_node=None, ending_nodes=None):
     result = {}
     for s, ts in graph.items():
@@ -264,12 +260,14 @@ def graph_with_end(graph, ending_nodes):
 
 
 def _flipped(graph):
+    """
+    return a dict[key:state, value:set] where the value set contains all sources
+    with a transition to the key state
+    """
     result = {}
     for s, ts in graph.items():
         for d, t in ts.items():
-            if not d in result:
-                result[d] = set()
-            result[d].add(s)
+            dict_entry_set_add(result, d, s)
     return result
 
 
@@ -284,6 +282,7 @@ def _ripout(graph, flipped, node):
     else:
         r_self = empty()
 
+    # this updates flipped with the transitions created in the below loop
     flipped_additions = {}
 
     for n_in in flipped[node]:
@@ -295,10 +294,7 @@ def _ripout(graph, flipped, node):
                 r_new = alter(r_already, r_new)
             graph[n_in][n_out] = r_new
 
-            if n_out in flipped_additions:
-                flipped_additions[n_out].add(n_in)
-            else:
-                flipped_additions[n_out] = set((n_in,))
+            dict_entry_set_add(flipped_additions, n_out, n_in)
 
     for n, add in flipped_additions.items():
         flipped[n].update(add)
@@ -320,6 +316,7 @@ def from_graph(source, starting_state, method):
     flipped = _flipped(regex_graph)
     all_nodes = source.keys()
 
+    # TODO investigate why `reversed(all_nodes)` results in much longer regexes
     for node in all_nodes:
         _ripout(regex_graph, flipped, node)
 

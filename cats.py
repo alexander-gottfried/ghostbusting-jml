@@ -2,6 +2,8 @@ import sys
 import functools
 import dataclasses
 
+from dictutil import dict_entry_set_add
+
 dataclass = functools.partial(
         dataclasses.dataclass,
         frozen=True, slots=True)
@@ -57,12 +59,6 @@ class AbstractTrace(CatNode):
     excluded: list[Event]
 
 
-def dict_entry_append(dic, key, item):
-    if key not in dic:
-        dic[key] = set()
-    dic[key].add(item)
-
-
 def possible_transition_maps(graph):
     result, flipped = {}, {}
     for src, transitions in graph.items():
@@ -71,8 +67,8 @@ def possible_transition_maps(graph):
                 result[method] = {}
                 flipped[method] = {}
             for dest in destinations:
-                dict_entry_append(result[method], src, dest)
-                dict_entry_append(flipped[method], dest, src)
+                dict_entry_set_add(result[method], src, dest)
+                dict_entry_set_add(flipped[method], dest, src)
     return result, flipped
 
 
@@ -80,9 +76,9 @@ def something(graph):
     prestates, preceders = {}, {}
     for src, transitions in graph.items():
         for method, destinations in transitions.items():
-            dict_entry_append(prestates, method, src)
+            dict_entry_set_add(prestates, method, src)
             for dest in destinations:
-                dict_entry_append(preceders, dest, method)
+                dict_entry_set_add(preceders, dest, method)
     return prestates, preceders
 
 
@@ -96,6 +92,7 @@ def from_graph(graph, methods, initial_state):
         m_pres = prestates[method]
         pops = set()
         for pre in m_pres:
+            if pre not in preceders: continue
             pops.update(preceders[pre])
         pops = (Event('pop', pop) for pop in list(pops))
         pops = functools.reduce(Union, pops)
