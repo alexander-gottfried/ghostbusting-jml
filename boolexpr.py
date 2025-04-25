@@ -1,3 +1,12 @@
+"""
+Classes for modeling boolean expressions in JML clauses. Being a subset of JML
+boolean expressions, Java boolean expressions may be modeled too.
+
+TODO:
+    - binary comparisons should be able to contain full expressions too. Add
+      those cases.
+"""
+
 import dataclasses
 import functools
 from enum import Enum, auto
@@ -9,6 +18,7 @@ dataclass = functools.partial(
 @dataclass
 class Value:
     def resolve(self, state, prestate):
+        """Return a variable's value given a state and prestate."""
         match self:
             case Literal(x):
                 return x
@@ -32,7 +42,9 @@ class Literal(Value):
 
 @dataclass
 class BoolExpr:
+    """Class representing a JML boolean expression."""
     def contains_old(self):
+        r"""Return True if the expression contains any \old() variables."""
         match self:
             case Rel(_, left, right):
                 return Old in (type(left), type(right))
@@ -137,10 +149,10 @@ def GreaterEqual(left, right):
 
 def satisfies[T](state: tuple[int], expr: BoolExpr, prestate=None) -> bool:
     """
-    state maps variables to values
+    Return True if the variable mapping represented by `state` satisfies
+    the boolean expression `expr`.
 
-    state should map all ghost variables
-    may raise a KeyError otherwise
+    `state` has to map all variables; KeyError may be raised otherwise.
     """
     match expr:
         case BoolTrue():
@@ -159,6 +171,13 @@ def satisfies[T](state: tuple[int], expr: BoolExpr, prestate=None) -> bool:
 
 @functools.cache
 def downprop_negations(a: BoolExpr) -> BoolExpr:
+    """
+    Eliminate `Not` by propagating them downwards and return the result. The
+    'leaves' of an expression are either binary comparisons like ==, or boolean
+    literals, which can be negated trivially.
+
+    Eliminating `Not` makes expressions easier to work with in some cases.
+    """
     match a:
         case Not(BoolTrue()):
             return BoolFalse()
@@ -187,7 +206,8 @@ def downprop_negations(a: BoolExpr) -> BoolExpr:
 def implies(a, b):
     return not(a) or b
 
-def expr_satisfies(one: BoolExpr, other: BoolExpr) -> BoolExpr:
+def expr_satisfies(one: BoolExpr, other: BoolExpr) -> bool:
+    """Return True if states satisfying `one` also satisfy `other`."""
     one, other = map(downprop_negations, (one, other))
     match one, other:
         case (_, BoolTrue()) | (BoolTrue(), _) | (BoolFalse(), _):
@@ -199,7 +219,7 @@ def expr_satisfies(one: BoolExpr, other: BoolExpr) -> BoolExpr:
         case (Equal(a, x), NotEqual(b, y)) | (NotEqual(a, x), Equal(b, y)):
             return implies(a == b, x != y)
         case NotEqual(a, x), NotEqual(b, y):
-            return true
+            return True
         case And(a, b), right:
             return (expr_satisfies(a, right)
                     and expr_satisfies(b, right))
@@ -212,3 +232,20 @@ def expr_satisfies(one: BoolExpr, other: BoolExpr) -> BoolExpr:
         case left, Or(a, b):
             return (expr_satisfies(left, a)
                     or expr_satisfies(left, b))
+
+
+def rename_old(expr, remap):
+    r"""
+    Replace \old variables with aliases as specified by the dict `remap`.
+
+    Used for translation into CATs.
+    """
+    match expr:
+        case Old(i):
+            return Variable(remap[i])
+        case Literal(_) | Variable(_) | RelType():
+            return expr
+    constr = type(expr)
+    args = (getattr(expr, slot) for slot in expr.__slots__)
+    args = (rename_old(arg, remap) for arg in args)
+    return constr(*args)

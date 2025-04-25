@@ -1,3 +1,7 @@
+"""
+Classes and functions to model and operate on regular expressions.
+"""
+
 import dataclasses
 import functools
 from typing import Self
@@ -5,8 +9,6 @@ from typing import Self
 from dictutil import dict_entry_set_add
 
 class Regex(object):
-    __match_args__ = ()
-
     def __str__(self):
         match self:
             case Empty():
@@ -56,6 +58,7 @@ class Concat(Regex):
     right: Self
 
     def __post_init__(self):
+        """Enforce concatenations of form `Concat(a, Concat(b, Concat(c,...)))"""
         if type(self.left) == Concat:
             raise TypeError("left of Concat can't be an Concat")
 
@@ -65,6 +68,7 @@ class Alter(Regex):
     right: Self
 
     def __post_init__(self):
+        """Enforce alternations of form `Alter(a, Alter(b, Alter(c, ...)))"""
         if type(self.left) == Alter:
             raise TypeError("left of Alter can't be an Alter")
 
@@ -77,33 +81,22 @@ class RepeatOne(Regex):
     expr: Regex
 
 
-def concat_to_list(regex):
-    match regex:
-        case Concat(left, Concat(_) as right):
-            return [left] + concat_to_list(right)
-        case Concat(left, right):
-            return [left, right]
-    return [regex]
-
-def alter_to_list(regex):
-    match regex:
-        case Alter(left, Alter(_) as right):
-            return [left] + alter_to_list(right)
-        case Alter(left, right):
-            return [left, right]
-    return [regex]
-
-
 # Constructors #
 # These perform trivial simplifications, like A** = A*
 
 def empty():
+    """Constructor for Empty"""
     return Empty()
 
 def terminal(x):
+    """Constructor for Terminal"""
     return Terminal(x)
 
 def repeat(e):
+    """
+    Constructor for Repeat.
+    Flattens nested repetitions.
+    """
     match e:
         case Empty() | Repeat(_):
             return e
@@ -113,6 +106,10 @@ def repeat(e):
             return Repeat(e)
 
 def repeat_one(e):
+    """
+    Constructor for RepeatOne.
+    Flattens nested repetitions.
+    """
     match e:
         case Empty() | Repeat(_) | RepeatOne(_):
             return e
@@ -122,6 +119,10 @@ def repeat_one(e):
             return RepeatOne(e)
 
 def optional(e):
+    """
+    Constructor for Optional.
+    Turns optional(RepeatOne(x)) into Repeat(x).
+    """
     match e:
         case Empty() | Repeat(_) | Optional(_):
             return e
@@ -131,6 +132,13 @@ def optional(e):
             return Optional(e)
 
 def concat(l, r):
+    """
+    Constructor for Concat.
+    Eliminates concatenations with Empty.
+    Ensures that chained concatenations are of a unified shape:
+      Concat(a, Concat(b, Concat(c, ...
+    which is easier to work with later on.
+    """
     match (l, r):
         case (Empty(), x) | (x, Empty()):
             return x
@@ -140,6 +148,13 @@ def concat(l, r):
             return Concat(l, r)
 
 def alter(l, r):
+    """
+    Constructor for Alter.
+    Eliminates empty alternations.
+    Ensures that chained alternations are of a unified shape:
+      Alter(a, Alter(b, Alter(c, ...
+    which is easier to work with later on.
+    """
     if l == r:
         return l
     match (l, r):
@@ -151,7 +166,39 @@ def alter(l, r):
             return Alter(l, r)
 
 
+def concat_to_list(regex):
+    """
+    Turn a concatenation into a list.
+    Relies on `regex` being constructed with the Concat-normalizing
+    constructor above.
+    """
+    match regex:
+        case Concat(left, Concat(_) as right):
+            return [left] + concat_to_list(right)
+        case Concat(left, right):
+            return [left, right]
+    return [regex]
+
+def alter_to_list(regex):
+    """
+    Turn a alternation into a list.
+    Relies on `regex` being constructed with the Alter-normalizing
+    constructor above.
+    """
+    match regex:
+        case Alter(left, Alter(_) as right):
+            return [left] + alter_to_list(right)
+        case Alter(left, right):
+            return [left, right]
+    return [regex]
+
+
 def pass_on(func, regex: Regex) -> Regex:
+    """
+    Helper function that applies `func` recursively to all class members of
+    `regex`.
+    Used in recursive functions below as a default case.
+    """
     match regex:
         case Empty() | Terminal(_):
             return regex
@@ -170,6 +217,12 @@ def pass_on(func, regex: Regex) -> Regex:
 
 
 def eliminate_optionals(regex: Regex) -> Regex:
+    """
+    Return a regular expression for a subset of `regex` that excludes all
+    optional substrings.
+
+    Resulting `Emtpy` terms simplified out by the constructors in `pass_on`.
+    """
     match regex:
         case Repeat(_) | Optional(_):
             return empty()
@@ -182,6 +235,12 @@ def eliminate_optionals(regex: Regex) -> Regex:
 
 
 def collapse_same_prefix(regex: Regex) -> Regex:
+    """
+    Returns regular expressions with these transformations:
+      ε|a -> a?
+      a|aX -> aX?
+      Xa|a -> X?a
+    """
     match regex:
         case Alter(Empty(), rest):
             rest = collapse_same_prefix(rest)
@@ -208,6 +267,7 @@ def must_contain(regex: Regex) -> Regex:
 
 
 def last_calls(regex: Regex) -> Regex:
+    """Return the last literal of each concatenation in an alternation."""
     regex = eliminate_optionals(regex)
 
     def aux(r):
@@ -227,6 +287,17 @@ def last_calls(regex: Regex) -> Regex:
 
 
 def graph(graph, starting_node=None, ending_nodes=None):
+    """
+    Convert a graph with transitions state--method->state into transitions
+    state--Terminal(method)->state, or state--Alter(...)->state if multiple
+    methods transition between the same two states.
+
+    If `starting_node` and `ending_nodes` are specified, add a special starting
+    node and ending node that connect to the original starting/ending nodes.
+
+    This is the first step in the state elimination method to convert a NFA
+    into a regular expression.
+    """
     result = {}
     for s, ts in graph.items():
         result[s] = {}
@@ -247,6 +318,7 @@ def graph(graph, starting_node=None, ending_nodes=None):
 
 
 def _depth_one_copy(graph):
+    """Return a non-shallow copy of a dictionary."""
     return {k: v.copy() for k, v in graph.items()}
 
 
@@ -272,6 +344,10 @@ def _flipped(graph):
 
 
 def _ripout(graph, flipped, node):
+    """
+    One step in the state elimination method. Eliminates one state by composing
+    all transitions into and out of the state.
+    """
     if not node in graph or not node in flipped:
         return
 
@@ -311,6 +387,9 @@ def _ripout(graph, flipped, node):
 
 
 def from_graph(source, starting_state, method):
+    """
+    Convert a NFA into a regular expression with the state elimination method.
+    """
     ending_nodes = [k for k, v in source.items() if method in v]
     regex_graph = graph(source, starting_state, ending_nodes)
     flipped = _flipped(regex_graph)

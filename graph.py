@@ -22,6 +22,13 @@ def from_program(initial_state, methods: dict[str, (boolexpr.BoolExpr, boolexpr.
 def from_program(possible_states,
                  methods: dict[str, (boolexpr.BoolExpr, boolexpr.BoolExpr)],
                  satisfies=boolexpr.satisfies):
+    """
+    Return a graph with transitions prestate--method-->poststate from all
+    possible prestates of a method to all its possible poststates. Possible
+    transitions are determined with the function `satisfies`.
+
+    The graph is of type dict[state->dict[method->state]].
+    """
     graph = {}
     print(possible_states)
 

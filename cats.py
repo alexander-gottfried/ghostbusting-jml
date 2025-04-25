@@ -3,6 +3,8 @@ import functools
 import dataclasses
 
 from dictutil import dict_entry_set_add
+from boolexpr import BoolExpr
+import jml
 
 dataclass = functools.partial(
         dataclasses.dataclass,
@@ -28,6 +30,10 @@ class CatNode(object):
                 return result
             case Event(eventtype, args):
                 return f'{eventtype}({args})'
+            case Observation(mappings, statement):
+                return f'℧{mappings}.⌈{statement}⌉'
+            case Statement(expr):
+                return f'⌈{expr}⌉'
         return None
 
 @dataclass
@@ -58,8 +64,24 @@ class Event(CatNode):
 class AbstractTrace(CatNode):
     excluded: list[Event]
 
+@dataclass
+class Observation(CatNode):
+    mappings: ... # would be a dict, but variable ids don't have a set type yet
+    statement: BoolExpr
+
+@dataclass
+class Statement(CatNode):
+    expr: BoolExpr
+
 
 def possible_transition_maps(graph):
+    """
+    Given a graph of form dict[state->dict[method->state]], return:
+    (1) a nested dictionary `result` where `result[method][start]` gives all
+    destination states `method` can transition into starting from `start`, and
+    (2) a nested dictionary `flipped` where `flipped[method][destination]`
+    gives all states that can transition into `destination` via `method`.
+    """
     result, flipped = {}, {}
     for src, transitions in graph.items():
         for method, destinations in transitions.items():
@@ -72,7 +94,14 @@ def possible_transition_maps(graph):
     return result, flipped
 
 
+#TODO rename
 def something(graph):
+    """
+    Given a graph of form dict[state->dict[method->state]], return:
+    (1) a dictionary `prestates` mapping each method to its possible prestates,
+    (2) a dictionary `preceders` mapping each state to the set of methods it is
+    a possible poststate of.
+    """
     prestates, preceders = {}, {}
     for src, transitions in graph.items():
         for method, destinations in transitions.items():
@@ -82,7 +111,15 @@ def something(graph):
     return prestates, preceders
 
 
-def from_graph(graph, methods, initial_state):
+def naive_pretrace_from_graph(graph, methods, initial_state):
+    """
+    Return a pre-trace for each method in `methods` of form
+    pop(preceders)⋅⋅excl[all] where preceders are all methods
+    that may run right before the method.
+
+    Union with ⋅⋅excl[all] if the method's prestates include an initial
+    state.
+    """
     prestates, preceders = something(graph)
     result = {}
 
@@ -104,27 +141,6 @@ def from_graph(graph, methods, initial_state):
 
     return result
 
-"""
-def from_graph(all_methods, initital_state):
-    pre_methods, post_methods = to_maps(all_methods)
 
-    exclude_all_methods = cats.AbstractTrace(
-            [m[0] for m in all_methods])
-
-    result = {}
-
-    for method_id, pres, _ in all_methods:
-        pops = set()
-        includes_init = False
-        for pre in pres:
-            if not pre in post_methods: continue
-            includes_init = (pre == initital_state) or includes_init
-            pops.update(post_methods[pre])
-        pops = (cats.Event('pop', pop) for pop in list(pops))
-        pops = functools.reduce(cats.Union, pops) # pop(m1) v pop(m2) v ...
-        pretrace = cats.Concat(pops, exclude_all_methods)
-        if includes_init: pretrace = cats.Union(exclude_all_methods, pretrace)
-        result[method_id] = pretrace
-
-    return result
-"""
+def from_prepostcondition(cond: jml.Requires | jml.Ensures):
+    ...
