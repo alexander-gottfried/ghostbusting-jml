@@ -14,7 +14,7 @@ import cases
 
 def main():
     variables, possible_states, initital_state, methods =\
-            cases.casino_invariants_only()
+            cases.simpler_casino_with_invariant_appended()
     g = graph.from_program(
             possible_states,
             methods)

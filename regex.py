@@ -1,6 +1,12 @@
 """
 Classes and functions to model and operate on regular expressions.
+
+If a citation for the state elimination method is needed:
+J. A. Brzozowski and E. J. McCluskey Jr. Signal flow graph techniques for sequential circuit state
+diagrams. IEEE Trans. on Electronic Computers, EC-12(2):67–76, 1963
 """
+
+# TODO [https://arxiv.org/pdf/1008.1656] for shorter regular expressions, maybe
 
 import dataclasses
 import functools

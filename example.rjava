@@ -1,4 +1,4 @@
-int wallet, bet, amountTobet, coinSide, guess;
+int wallet, bet, amountToBet, coinSide, guess;
 
 //@ ghost final int GAME_AVAILABLE = 0;
 //@ ghost final int BET_PLACED = 1;
@@ -12,9 +12,23 @@ int wallet, bet, amountTobet, coinSide, guess;
 //@ ensures state == BET_PLACED && preState == GAME_AVAILABLE;
 //@ requires amountToBet > 0 && wallet >= amountToBet;
 //@ ensures wallet == \old(wallet) - bet;
-placeBet() { }
+void placeBet() {
+  bet = amountToBet;
+  wallet -= bet;
+  //@set preState = GAME_AVAILABLE;
+  //@set state = BET_PLACED;
+  return;
+}
 
 //@ requires state == BET_PLACED;
 //@ ensures state == GAME_AVAILABLE;
 //@ ensures \old(coinSide) != \old(guess) ==> wallet == \old(wallet) && \old(coinSide) == \old(guess) ==> wallet == \old(wallet) + 2*\old(bet);
-decideBet() { }
+void decideBet() {
+  if (coinSide == guess) {
+    wallet += 2*bet;
+  }
+  bet = 0;
+  //@set preState = BET_PLACED;
+  //@set state = GAME_AVAILABLE;
+  return;
+}
