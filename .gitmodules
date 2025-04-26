@@ -1,3 +1,3 @@
 [submodule "tree-sitter-java"]
 	path = tree-sitter-java
-	url = git@github-uni:alexander-gottfried/tree-sitter-java
+	url = https://github.com/alexander-gottfried/ghostbusting-jml
