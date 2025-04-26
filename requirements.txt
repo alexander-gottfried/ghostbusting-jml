@@ -1,3 +1,2 @@
-setuptools==79.0.1
 tree-sitter==0.24.0
-./tree-sitter-java_jml_subset
+./tree-sitter-java

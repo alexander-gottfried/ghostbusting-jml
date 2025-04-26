@@ -1,4 +1,20 @@
 #! .venv/bin/python
+import importlib.util
+_parser_spec = importlib.util.find_spec("tree_sitter_java")
+if _parser_spec is None:
+    print(
+"""
+Local parser module 'tree-sitter-java' is not installed.
+Run either
+  make
+or
+  python -m venv .venv
+  ./.venv/bin/pip install -r requirements.txt
+first.
+""")
+    quit(1)
+del _parser_spec
+
 import sys
 
 import collections
