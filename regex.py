@@ -14,33 +14,34 @@ from typing import Self
 
 from dictutil import dict_entry_set_add
 
-class Regex(object):
+class Regex:
     def __str__(self):
         match self:
             case Empty():
-                return 'ε'
+                result = 'ε'
             case Terminal(name):
-                return str(name)
+                result = str(name)
             case Concat(Alter(al, ar), right):
-                return f'({al} | {ar}) {right}'
+                result = f'({al} | {ar}) {right}'
             case Concat(left, Alter(al, ar)):
-                return f'{left} ({al} | {ar})'
+                result = f'{left} ({al} | {ar})'
             case Concat(left, right):
-                return f'{left} {right}'
+                result = f'{left} {right}'
             case Alter(left, right):
-                return f'{left} | {right}'
+                result = f'{left} | {right}'
             case Repeat(Terminal(name)):
-                return f'{name}*'
+                result = f'{name}*'
             case RepeatOne(Terminal(name)):
-                return f'{name}+'
+                result = f'{name}+'
             case Optional(Terminal(name)):
-                return f'{name}?'
+                result = f'{name}?'
             case Repeat(expr):
-                return f'({expr})*'
+                result = f'({expr})*'
             case RepeatOne(expr):
-                return f'({expr})+'
+                result = f'({expr})+'
             case Optional(expr):
-                return f'({expr})?'
+                result = f'({expr})?'
+        return result
 
 dataclass = functools.partial(
         dataclasses.dataclass,
@@ -65,7 +66,7 @@ class Concat(Regex):
 
     def __post_init__(self):
         """Enforce concatenations of form `Concat(a, Concat(b, Concat(c,...)))"""
-        if type(self.left) == Concat:
+        if isinstance(self.left, Concat):
             raise TypeError("left of Concat can't be an Concat")
 
 @dataclass
@@ -75,7 +76,7 @@ class Alter(Regex):
 
     def __post_init__(self):
         """Enforce alternations of form `Alter(a, Alter(b, Alter(c, ...)))"""
-        if type(self.left) == Alter:
+        if isinstance(self.left, Alter):
             raise TypeError("left of Alter can't be an Alter")
 
 @dataclass
@@ -292,7 +293,7 @@ def last_calls(regex: Regex) -> Regex:
     return set(alter_to_list(aux(regex)))
 
 
-def graph(graph, starting_node=None, ending_nodes=None):
+def to_regex_graph(graph, starting_node=None, ending_nodes=None):
     """
     Convert a graph with transitions state--method->state into transitions
     state--Terminal(method)->state, or state--Alter(...)->state if multiple
@@ -344,7 +345,7 @@ def _flipped(graph):
     """
     result = {}
     for s, ts in graph.items():
-        for d, t in ts.items():
+        for d, _ in ts.items():
             dict_entry_set_add(result, d, s)
     return result
 
@@ -397,7 +398,7 @@ def from_graph(source, starting_state, method):
     Convert a NFA into a regular expression with the state elimination method.
     """
     ending_nodes = [k for k, v in source.items() if method in v]
-    regex_graph = graph(source, starting_state, ending_nodes)
+    regex_graph = to_regex_graph(source, starting_state, ending_nodes)
     flipped = _flipped(regex_graph)
     all_nodes = source.keys()
 

@@ -21,11 +21,12 @@ class Value:
         """Return a variable's value given a state and prestate."""
         match self:
             case Literal(x):
-                return x
+                result = x
             case Variable(i):
-                return state[i]
+                result = state[i]
             case Old(i):
-                return prestate[i]
+                result = prestate[i]
+        return result
 
 @dataclass
 class Variable(Value):
@@ -47,13 +48,14 @@ class BoolExpr:
         r"""Return True if the expression contains any \old() variables."""
         match self:
             case Rel(_, left, right):
-                return Old in (type(left), type(right))
+                result = Old in (type(left), type(right))
             case And(left, right) | Or(left, right):
-                return left.contains_old() or right.contains_old()
+                result = left.contains_old() or right.contains_old()
             case Not(e):
-                return e.contains_old()
+                result = e.contains_old()
             case BoolTrue() | BoolFalse():
-                return False
+                result = False
+        return result
 
 @dataclass
 class And(BoolExpr):
@@ -78,12 +80,12 @@ class BoolFalse(BoolExpr):
     pass
 
 class RelType(Enum):
-    Equal = auto()
-    NotEqual = auto()
-    LessThan = auto()
-    LessEqual = auto()
-    GreaterThan = auto()
-    GreaterEqual = auto()
+    EQUAL = auto()
+    NOT_EQUAL = auto()
+    LESS_THAN = auto()
+    LESS_EQUAL = auto()
+    GREATER_THAN = auto()
+    GREATER_EQUAL = auto()
 
 @dataclass
 class Rel(BoolExpr):
@@ -93,61 +95,64 @@ class Rel(BoolExpr):
 
     def negation(self):
         match self.kind:
-            case RelType.Equal:
-                return Rel(RelType.NotEqual, self.left, self.right)
-            case RelType.NotEqual:
-                return Rel(RelType.Equal, self.left, self.right)
-            case RelType.LessThan:
-                return Rel(RelType.GreaterEqual, self.left, self.right)
-            case RelType.LessEqual:
-                return Rel(RelType.GreaterThan, self.left, self.right)
-            case RelType.GreaterThan:
-                return Rel(RelType.LessEqual, self.left, self.right)
-            case RelType.GreaterEqual:
-                return Rel(RelType.LessThan, self.left, self.right)
+            case RelType.EQUAL:
+                result = Rel(RelType.NOT_EQUAL, self.left, self.right)
+            case RelType.NOT_EQUAL:
+                result = Rel(RelType.EQUAL, self.left, self.right)
+            case RelType.LESS_THAN:
+                result = Rel(RelType.GREATER_EQUAL, self.left, self.right)
+            case RelType.LESS_EQUAL:
+                result = Rel(RelType.GREATER_THAN, self.left, self.right)
+            case RelType.GREATER_THAN:
+                result = Rel(RelType.LESS_EQUAL, self.left, self.right)
+            case RelType.GREATER_EQUAL:
+                result = Rel(RelType.LESS_THAN, self.left, self.right)
+        return result
 
     def evaluate(self, state, prestate=None):
         left = self.left.resolve(state, prestate)
         right = self.right.resolve(state, prestate)
         match self.kind:
-            case RelType.Equal:
-                return left == right
-            case RelType.NotEqual:
-                return left != right
-            case RelType.LessThan:
-                return left < right
-            case RelType.LessEqual:
-                return left <= right
-            case RelType.GreaterThan:
-                return left > right
-            case RelType.GreaterEqual:
-                return left >= right
+            case RelType.EQUAL:
+                result = left == right
+            case RelType.NOT_EQUAL:
+                result = left != right
+            case RelType.LESS_THAN:
+                result = left < right
+            case RelType.LESS_EQUAL:
+                result = left <= right
+            case RelType.GREATER_THAN:
+                result = left > right
+            case RelType.GREATER_EQUAL:
+                result = left >= right
+        return result
 
-def _Rel(kind, left, right):
-    if type(left) is int: left = Literal(left)
-    if type(right) is int: right = Literal(right)
+def _rel(kind, left, right):
+    def to_literal(node):
+        return Literal(node) if isinstance(node, int) else node
+    left, right = map(to_literal, (left, right))
     return Rel(kind, left, right)
 
 def Equal(left, right):
-    return _Rel(RelType.Equal, left, right)
+    return _rel(RelType.EQUAL, left, right)
 
 def NotEqual(left, right):
-    return _Rel(RelType.NotEqual, left, right)
+    return _rel(RelType.NOT_EQUAL, left, right)
 
 def LessThan(left, right):
-    return _Rel(RelType.LessThan, left, right)
+    return _rel(RelType.LESS_THAN, left, right)
 
 def LessEqual(left, right):
-    return _Rel(RelType.LessEqual, left, right)
+    return _rel(RelType.LESS_EQUAL, left, right)
 
 def GreaterThan(left, right):
-    return _Rel(RelType.GreaterThan, left, right)
+    return _rel(RelType.GREATER_THAN, left, right)
 
 def GreaterEqual(left, right):
-    return _Rel(RelType.GreaterEqual, left, right)
+    return _rel(RelType.GREATER_EQUAL, left, right)
 
 
-def satisfies[T](state: tuple[int], expr: BoolExpr, prestate=None) -> bool:
+def satisfies(state: tuple[int], expr: BoolExpr, prestate=None) -> bool:
     """
     Return True if the variable mapping represented by `state` satisfies
     the boolean expression `expr`.
@@ -156,17 +161,18 @@ def satisfies[T](state: tuple[int], expr: BoolExpr, prestate=None) -> bool:
     """
     match expr:
         case BoolTrue():
-            return True
+            result = True
         case BoolFalse():
-            return False
+            result = False
         case Rel(_, _, _):
-            return expr.evaluate(state, prestate)
+            result = expr.evaluate(state, prestate)
         case And(left, right):
-            return satisfies(state, left) and satisfies(state, right)
+            result = satisfies(state, left) and satisfies(state, right)
         case Or(left, right):
-            return satisfies(state, left) or satisfies(state, right)
+            result = satisfies(state, left) or satisfies(state, right)
         case Not(a):
-            return not satisfies(state, a)
+            result = not satisfies(state, a)
+    return result
 
 
 @functools.cache
@@ -178,30 +184,31 @@ def downprop_negations(a: BoolExpr) -> BoolExpr:
 
     Eliminating `Not` makes expressions easier to work with in some cases.
     """
+    result = a
     match a:
         case Not(BoolTrue()):
-            return BoolFalse()
+            result = BoolFalse()
         case Not(BoolFalse()):
-            return BoolTrue()
+            result = BoolTrue()
         case Not(Equal(name, val)):
-            return NotEqual(name, val)
+            result = NotEqual(name, val)
         case Not(NotEqual(name, val)):
-            return Equal(name, val)
+            result = Equal(name, val)
         case Not(And(left, right)):
             left, right = map(lambda x: downprop_negations(Not(x)), (left, right))
-            return Or(left, right)
+            result = Or(left, right)
         case Not(Or(left, right)):
             left, right = map(lambda x: downprop_negations(Not(x)), (left, right))
-            return And(left, right)
+            result = And(left, right)
         case Not(Not(a)):
-            return downprop_negations(a)
+            result = downprop_negations(a)
         case And(left, right):
             left, right = map(downprop_negations, (left, right))
-            return And(left, right)
+            result = And(left, right)
         case Or(left, right):
             left, right = map(downprop_negations, (left, right))
-            return Or(left, right)
-    return a
+            result = Or(left, right)
+    return result
 
 def implies(a, b):
     return not(a) or b
@@ -211,27 +218,28 @@ def expr_satisfies(one: BoolExpr, other: BoolExpr) -> bool:
     one, other = map(downprop_negations, (one, other))
     match one, other:
         case (_, BoolTrue()) | (BoolTrue(), _) | (BoolFalse(), _):
-            return True
+            result = True
         case _, BoolFalse():
-            return False
+            result = False
         case Equal(a, x), Equal(b, y):
-            return implies(a == b, x == y)
+            result = implies(a == b, x == y)
         case (Equal(a, x), NotEqual(b, y)) | (NotEqual(a, x), Equal(b, y)):
-            return implies(a == b, x != y)
+            result = implies(a == b, x != y)
         case NotEqual(a, x), NotEqual(b, y):
-            return True
+            result = True
         case And(a, b), right:
-            return (expr_satisfies(a, right)
+            result = (expr_satisfies(a, right)
                     and expr_satisfies(b, right))
         case Or(a, b), right:
-            return (expr_satisfies(a, right)
+            result = (expr_satisfies(a, right)
                     or expr_satisfies(b, right))
         case left, And(a, b):
-            return (expr_satisfies(left, a)
+            result = (expr_satisfies(left, a)
                     and expr_satisfies(left, b))
         case left, Or(a, b):
-            return (expr_satisfies(left, a)
+            result = (expr_satisfies(left, a)
                     or expr_satisfies(left, b))
+    return result
 
 
 def rename_old(expr, remap):

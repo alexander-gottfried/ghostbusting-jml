@@ -1,22 +1,5 @@
-import boolexpr
 import itertools
-
-def from_program(initial_state, methods: dict[str, (boolexpr.BoolExpr, boolexpr.BoolExpr)]):
-    stack = [name for name, (pre, _) in methods.items()
-             if boolexpr.satisfies(initial_state, pre)]
-
-    graph = {}
-    graph['init'] = set(stack)
-
-    while len(stack) > 0:
-        name = stack.pop()
-        _, post = methods[name]
-        graph[name] = set(other_name for other_name, (other_pre, _) in methods.items()
-                          if boolexpr.expr_satisfies(post, other_pre))
-        stack.extend(other_name for other_name in graph[name]
-                     if other_name not in graph)
-
-    return graph
+import boolexpr
 
 
 def from_program(possible_states,
@@ -59,4 +42,3 @@ def from_program(possible_states,
             graph[pre][name].append(post)
 
     return graph
-

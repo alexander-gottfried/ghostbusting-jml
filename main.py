@@ -30,7 +30,7 @@ import cases
 
 def main():
     variables, possible_states, initital_state, methods =\
-            cases.simpler_casino_with_invariant_appended()
+            cases.imagine()
     g = graph.from_program(
             possible_states,
             methods)
@@ -57,11 +57,12 @@ def main():
 
 from boolexpr import *
 
-def main():
+def _main():
     import parser
     example = './example.rjava'
     parser.parse(example)
 
 
+# TODO make it that one can select which main function to run
 if __name__ == '__main__':
     main()

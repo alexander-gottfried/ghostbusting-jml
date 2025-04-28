@@ -11,30 +11,31 @@ dataclass = functools.partial(
         frozen=True, slots=True)
 
 @dataclass
-class CatNode(object):
+class CatNode:
     def __str__(self, paren=False, cdot=False):
+        result = None
         match self:
             case Union(l, r):
                 if paren:
-                    return f'({l} ∨ {r})'
-                return f'{l} ∨ {r}'
+                    result = f'({l} ∨ {r})'
+                result = f'{l} ∨ {r}'
             case Concat(l, r):
                 mid = '' if AbstractTrace in [type(l), type(r)] else ' ⋅ '
                 l, r = map(functools.partial(CatNode.__str__, paren=True), (l, r))
-                return l + mid + r
-            case FixPoint(expr):
-                return f'μ{recvar}.({expr})'
+                result = l + mid + r
+            case FixPoint(recvar, expr):
+                result = f'μ{recvar}.({expr})'
             case AbstractTrace(excluded):
                 result = '⋅⋅'
                 if excluded: result += f'excl{excluded}'
-                return result
+                result = result
             case Event(eventtype, args):
-                return f'{eventtype}({args})'
+                result = f'{eventtype}({args})'
             case Observation(mappings, statement):
-                return f'℧{mappings}.⌈{statement}⌉'
+                result = f'℧{mappings}.⌈{statement}⌉'
             case Statement(expr):
-                return f'⌈{expr}⌉'
-        return None
+                result = f'⌈{expr}⌉'
+        return result
 
 @dataclass
 class Union(CatNode):
@@ -124,7 +125,7 @@ def naive_pretrace_from_graph(graph, methods, initial_state):
     result = {}
 
     exclude_all_methods = AbstractTrace(methods)
-    
+
     for method in methods:
         m_pres = prestates[method]
         pops = set()
@@ -134,7 +135,7 @@ def naive_pretrace_from_graph(graph, methods, initial_state):
         pops = (Event('pop', pop) for pop in list(pops))
         pops = functools.reduce(Union, pops)
         pretrace = Concat(pops, exclude_all_methods)
-        includes_init = (initial_state in m_pres)
+        includes_init = initial_state in m_pres
         if includes_init:
             pretrace = Union(exclude_all_methods, pretrace)
         result[method] = pretrace
