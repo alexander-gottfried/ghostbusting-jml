@@ -3,13 +3,15 @@ VENV=.venv
 
 all: venv
 
-parser: $(PARSER)/grammar.js
+gen_parser: $(PARSER)/grammar.js
 	cd $(PARSER) && \
 	tree-sitter generate && \
 	tree-sitter build
+
+parser: gen_parser
 	$(VENV)/bin/pip install --force-reinstall ./$(PARSER)
 
-venv: parser
+venv: gen_parser
 	mkdir $(VENV)
 	python -m venv $(VENV)
 	$(VENV)/bin/pip install -r requirements.txt
