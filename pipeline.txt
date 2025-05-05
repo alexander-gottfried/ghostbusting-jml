@@ -1,0 +1,86 @@
+read in file and parse with tree-sitter
+
+// cite JML grammar from the reference manual to justify my custom grammar
+
+convert tree-sitter syntax tree
+  find toplevel ghost declarations and their values
+  -> dict name: expression
+  find methods and their contracts
+  -> dict name: contract
+  find jml assignments in method bodies
+  -> dict varname: list of rhs
+  rest is irrelevant; not translated
+
+split method contracts
+  e.g. `requires A && B;` becomes `requires A; requires B;`
+  (this makes later steps easier)
+
+// cite reference manual to justify splitting
+
+
+# Temporal Properties
+
+find ghost variables that are used as state
+  check that their initial values are constants
+  check that all of their assignments (collected above) are constants
+-> set of ghosts representing NFA state (state variables)
+-> and their possible states values
+
+// clarify that assignments to arithmetic expressions disqualify a variable
+// also, make clear that the scope here is limited to NFAs
+// other potential uses of ghost variables come later / are discussed later
+
+collect methods whose contracts mention state variables
+  filter out contract clauses that don't mention state variables
+-> set of specified methods with relevant pre/postconditions
+
+create a _state transition graph_
+  for every pair of states (a,b), find all methods whose precondition matches a
+  and whose postcondition matches b; those are the transitions between a & b
+  mark the initial state as the starting state of the graph
+
+// make extra clear what this graph represents so below steps make sense
+
+create naive pretraces for methods m
+  find all methods that transition into a prestate of m
+  -> methods N that may run 'immediately' before m
+  check if m's prestates include the ghost initial state
+  create a CAT trace expressing that methods N may run before m
+    and union with 'empty' trace if prestates include ghost initial state
+-> naive pretraces for methods
+
+// this part is directly inspired by the lingua franca paper
+
+convert _state transition graph_ into regex expressions
+  prepare the graph
+    change transitions labeled with m into transisitions labeled with terminal
+     symbols representing m
+    if there are multiple transitions between two states, merge them into
+     alternations
+    add a new starting node and ending node; connect them to original
+     starting/ending nodes with empty transitions
+  then apply state elimination method of converting NFA into regex
+-> method pretraces expressed as regular expressions
+
+// make connection between traces (finite sequences) and regular expressions
+// clear
+
+post-process regular expressions
+  simplify expressions
+  filter out optional terms
+
+// TODO also need to justify this step
+
+translate into CAT traces
+  CAT trace logic has primitives that map nicely to regex
+-> FINAL pre-traces for temporal properties
+
+// justify translations
+
+
+# State-based properties
+
+translate remaining contract clauses that don't include ghost variables
+
+intersect translations with temporal property pre-traces
+-> pre-traces and preconditions for each method
