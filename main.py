@@ -57,7 +57,7 @@ def main():
 
 from boolexpr import *
 
-def _main():
+def main():
     import parser
     example = './example.rjava'
     parser.parse(example)
